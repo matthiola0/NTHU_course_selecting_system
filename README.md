@@ -2,6 +2,7 @@
 
 This is a smart course recommendation system specifically designed for Computer Science students at National Tsing Hua University (NTHU). The goal of this project is to help students automatically plan their four-year curriculum based on departmental graduation requirements and individual preferences. It effectively avoids course time conflicts and optimizes the learning path.
 
+Try it online: https://nthu-course-selecting-system.streamlit.app/
 
 ## Features
 
