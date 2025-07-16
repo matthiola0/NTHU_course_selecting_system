@@ -25,6 +25,11 @@ def get_prepared_courses_and_settings(df, settings):
     SelectNumberList = settings['SelectNumberList']
     EnglishNameList = settings['EnglishNameList']
     SelectType = settings['SelectType']
+    unwanted_courses = settings.get('unwanted_courses', []) # 取得不想上的課程清單
+
+    # 在最一開始就排除不想上的課程 ***
+    if unwanted_courses:
+        df = df[~df['中文課名'].isin(unwanted_courses)].copy()
 
     CSclassData = df[df['系所全名'] == '資訊工程學系'].dropna(subset=['科號', '中文課名', '學分', '上課時間'])
     EECSclassData = df[df['系所全名'] == '電機資訊學院學士班'].dropna(subset=['科號', '中文課名', '學分', '上課時間'])
@@ -40,10 +45,10 @@ def get_prepared_courses_and_settings(df, settings):
         AddclassData = df[df['中文課名'] == course_name].dropna(subset=['科號', '系所全名', '學分'])
         AllCoursesData = pd.concat([AllCoursesData, AddclassData], ignore_index=True)
 
-    if "1" in SelectNumberList:  # 數學系
+    if "1" in SelectNumberList:
         MATHclassData = df[df['系所全名'] == '數學系'].dropna(subset=['科號', '中文課名', '學分', '上課時間'])
         AllCoursesData = pd.concat([AllCoursesData, MATHclassData], ignore_index=True)
-    if "2" in SelectNumberList:  # 物理系
+    if "2" in SelectNumberList:
         PHYSclassData = df[df['系所全名'] == '物理學系'].dropna(subset=['科號', '中文課名', '學分', '上課時間'])
         AllCoursesData = pd.concat([AllCoursesData, PHYSclassData], ignore_index=True)
 
@@ -64,7 +69,7 @@ def get_prepared_courses_and_settings(df, settings):
     AllCoursesData['教師'] = AllCoursesData['教師'].fillna('')
     AllCoursesData['等級制'] = AllCoursesData['等級制'].fillna(0)
     AllCoursesData = AllCoursesData.drop_duplicates(subset=['科號', '上課時間']).reset_index(drop=True)
-
+    
     Type = [
         ['常微分方程','訊號與系統','正規語言','數值最佳化','量子計算概論'], # A
         ['電路與電子學一','積體電路設計概論','嵌入式系統概論','編譯器設計','超大型積體電路系統設計'], # B
@@ -104,7 +109,7 @@ def get_prepared_courses_and_settings(df, settings):
 
 def get_recommended_schedule(settings, AllCoursesData, GEclassData, AddCourseABCD, cs_learn_df):
     """
-    核心排課演算法，此函式整合了您 SelectCourse.py 的主要邏輯。
+    核心排課演算法
     """
     CreditList = settings['CreditList']
     SelectCourse = settings['SelectCourse']
@@ -127,14 +132,12 @@ def get_recommended_schedule(settings, AllCoursesData, GEclassData, AddCourseABC
     def is_conflict(semester, time_mapping):
         return any(course_codes[semester, t[0], t[1]] is not None for t in time_mapping)
 
-    # 函式: 嘗試排課
     def try_schedule_course(course_df, semester):
         time_str = str(course_df['上課時間'].iloc[0]).replace(',', '')
         school_point = int(course_df['學分'].iloc[0])
         
         time_mapping = []
         is_valid_time = True
-        # 檢查時間字串長度是否為偶數
         if len(time_str) % 2 != 0:
             is_valid_time = False
         else:
@@ -142,51 +145,41 @@ def get_recommended_schedule(settings, AllCoursesData, GEclassData, AddCourseABC
                 day_char = time_str[i]
                 period_char = time_str[i+1]
                 
-                # 檢查星期和節次是否為有效鍵值
                 if day_char not in WEEKDAY_MAPPING or period_char not in NUMBER_MAPPING:
                     is_valid_time = False
                     break
                 time_mapping.append([WEEKDAY_MAPPING[day_char], NUMBER_MAPPING[period_char]])
 
         if not is_valid_time:
-            # 在終端機印出警告訊息，方便使用者除錯自己的資料檔
             print(f"警告：課程 '{course_df['中文課名'].iloc[0]}' (科號: {course_df['科號'].iloc[0]}) 的上課時間 '{time_str}' 格式錯誤，將跳過此課程。")
-            return False # 格式錯誤，無法排課
+            return False
 
         if (credit[semester] + school_point) > CreditList[semester] or is_conflict(semester, time_mapping):
             return False
 
-        # 檢查開課年級 (如果科號符合格式)
         try:
             course_year = int(str(course_df['科號'].iloc[0])[-6])
-            # 年級不符 (假設科號年級>0，且不是通識或體育等)
             if course_year > 0 and 'GEC' not in str(course_df['科號'].iloc[0]) and course_year != (semester // 2) + 1:
                 return False
         except (ValueError, IndexError):
-            pass  # 科號格式不符，忽略年級檢查
+            pass
 
-        # 排課成功
         for t in time_mapping:
             course_codes[semester, t[0], t[1]] = course_df['中文課名'].iloc[0]
         credit[semester] += school_point
         course_list[semester] = pd.concat([course_list[semester], course_df], ignore_index=True)
         return True
 
-    # 階段一: 處理必修 (Type 0, 1) 和專業選修 (Type 2)
+    # 階段一: 處理必修和專業選修
     for type_val in range(3):
         MustclassData = pd.DataFrame()
-        if type_val == 0:
-            MustclassData = cs_learn_df[cs_learn_df['類別'] == '1'].dropna(subset=['中文課名', '科號'])
-        elif type_val == 1:
-            MustclassData = cs_learn_df[cs_learn_df['類別'] == SelectCourse].dropna(subset=['中文課名', '科號'])
-        elif type_val == 2:
-            MustclassData = AddCourseABCD
+        if type_val == 0: MustclassData = cs_learn_df[cs_learn_df['類別'] == '1'].dropna(subset=['中文課名', '科號'])
+        elif type_val == 1: MustclassData = cs_learn_df[cs_learn_df['類別'] == SelectCourse].dropna(subset=['中文課名', '科號'])
+        elif type_val == 2: MustclassData = AddCourseABCD
 
         for _, row in MustclassData.iterrows():
-            if row['科號'] == '-1':
-                temp_courses = AllCoursesData.loc[AllCoursesData['中文課名'] == row['中文課名']]
-            else:
-                temp_courses = AllCoursesData.loc[AllCoursesData['科號'].astype(str).str.contains(str(row['科號']))]
+            if row['科號'] == '-1': temp_courses = AllCoursesData.loc[AllCoursesData['中文課名'] == row['中文課名']]
+            else: temp_courses = AllCoursesData.loc[AllCoursesData['科號'].astype(str).str.contains(str(row['科號']))]
             
             temp_courses = temp_courses.sort_values(by='等級制', ascending=False)
             
@@ -198,13 +191,11 @@ def get_recommended_schedule(settings, AllCoursesData, GEclassData, AddCourseABC
                         result_df = pd.concat([result_df, course_df], ignore_index=True)
                         scheduled = True
                         break
-                if scheduled:
-                    break
+                if scheduled: break
     
     # 階段二: 處理通識 (GE)
     GE_Credit = 0
     GE_list = []
-    # 核心通識
     for i in range(1, 5):
         core_ge = GEclassData[GEclassData['通識分類'].str.contains(f'核心通識CoreGEcourses{i}', na=False)].sort_values(by='等級制', ascending=False)
         for _, row in core_ge.iterrows():
@@ -218,7 +209,7 @@ def get_recommended_schedule(settings, AllCoursesData, GEclassData, AddCourseABC
                     scheduled = True
                     break
             if scheduled: break
-    # 補滿剩餘通識
+
     remaining_ge = GEclassData[~GEclassData['科號'].isin(GE_list)].sort_values(by='等級制', ascending=False)
     for _, row in remaining_ge.iterrows():
         if GE_Credit >= 20: break
@@ -246,7 +237,7 @@ def get_recommended_schedule(settings, AllCoursesData, GEclassData, AddCourseABC
                 result_df = pd.concat([result_df, course_df], ignore_index=True)
                 break
 
-    # 階段四: 處理其餘選修 (補滿各學期學分)
+    # 階段四: 處理其餘選修
     other_elective = AllCoursesData[~AllCoursesData['科號'].isin(result_df['科號'])]
     other_elective = other_elective.sort_values(by='等級制', ascending=False)
     for sem in range(8):
@@ -258,8 +249,7 @@ def get_recommended_schedule(settings, AllCoursesData, GEclassData, AddCourseABC
                      result_df = pd.concat([result_df, row.to_frame().T], ignore_index=True)
                      scheduled_in_sem = True
                      break
-            if not scheduled_in_sem:
-                break
+            if not scheduled_in_sem: break
     
     total_credits = sum(credit)
     

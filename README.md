@@ -2,7 +2,6 @@
 
 This is a smart course recommendation system specifically designed for Computer Science students at National Tsing Hua University (NTHU). The goal of this project is to help students automatically plan their four-year curriculum based on departmental graduation requirements and individual preferences. It effectively avoids course time conflicts and optimizes the learning path.
 
----
 
 ## Features
 
@@ -21,14 +20,12 @@ This is a smart course recommendation system specifically designed for Computer 
   * Web-based UI using Streamlit for intuitive operation.
   * Command-line interface (CLI) for developers to quickly test and validate results.
 
----
 
 ## Tech Stack
 
 * **Core Framework**: Python, Streamlit
 * **Data Processing**: Pandas, NumPy
 
----
 
 ## Installation Guide
 
@@ -38,7 +35,6 @@ All required packages are listed in `requirements.txt`.
 pip install -r requirements.txt
 ```
 
----
 
 ## How to Run
 
@@ -73,7 +69,6 @@ This mode allows you to execute the course planner directly in the terminal usin
    python cli.py --credits 20 20 18 18 15 15 12 10
    ```
 
----
 
 ## File Structure
 
@@ -88,4 +83,4 @@ The project uses a separation-of-concerns architecture to ensure clear and maint
 └── README.md                # This documentation file
 ```
 
----
+

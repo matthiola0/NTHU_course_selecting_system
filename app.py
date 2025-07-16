@@ -3,7 +3,7 @@ import pandas as pd
 import time
 from course_logic import load_data, get_prepared_courses_and_settings, get_recommended_schedule
 
-# --- 輔助函式 ---
+# --- 輔助函式 (維持不變) ---
 
 def set_null_time_schedule():
     """設定一個空的時間表 DataFrame"""
@@ -20,7 +20,6 @@ def fill_in_time_schedule(dataframe, result_df):
     if result_df.empty:
         return dataframe
     
-    # 對照表
     weekday_map = {'M': 'M', 'T': 'T', 'W': 'W', 'R': 'R', 'F': 'F', 'S': 'S'}
     
     for _, row in result_df.iterrows():
@@ -32,41 +31,12 @@ def fill_in_time_schedule(dataframe, result_df):
                 dataframe.loc[period, day] = f"{row['中文課名']}<br>{row['教師']}"
     return dataframe
 
-# --- 登入邏輯 ---
-
-def check_login():
-    """顯示登入表單並驗證"""
-    st.set_page_config(page_title="登入 - 課程推薦系統", layout="centered")
-    st.title("🎓 清華大學課程推薦系統")
-    
-    # 模擬的用戶資料庫
-    VALID_USERS = {
-        "testuser": "password123",
-        "nthucs": "cs"
-    }
-
-    with st.form("login_form"):
-        username = st.text_input("學號 (Username)")
-        password = st.text_input("密碼 (Password)", type="password")
-        submitted = st.form_submit_button("登入")
-
-        if submitted:
-            if username in VALID_USERS and VALID_USERS[username] == password:
-                st.session_state["logged_in"] = True
-                st.session_state["username"] = username
-                st.rerun()  # 重新執行腳本以進入主應用
-            else:
-                st.error("帳號或密碼錯誤！")
-
 # --- 主應用程式介面 ---
 
 def main_app():
     """課程推薦系統的主介面"""
     st.set_page_config(page_title="清大課程推薦系統", page_icon="🎓", layout="wide")
     
-    st.sidebar.header(f"👋 你好, {st.session_state['username']}")
-    st.sidebar.write("---")
-
     st.title("🎓 清華大學課程推薦系統")
     st.info("本系統旨在幫助資工系學生根據畢業門檻和個人偏好，智慧推薦未來四年的修課排程。")
 
@@ -109,33 +79,40 @@ def main_app():
             format_func=lambda x: eng_options.get(x)
         )
         
+        # 選擇不想上的課程 ***
+        all_courses_df, _ = load_data()
+        if all_courses_df is not None:
+            # 取得所有不重複的課程名稱並排序
+            all_course_names = sorted(all_courses_df['中文課名'].unique().tolist())
+            unwanted_courses = st.multiselect(
+                "選擇不想上的特定課程 (可多選)",
+                options=all_course_names,
+                help="在此選擇的課程將不會出現在推薦課表中。"
+            )
+        else:
+            unwanted_courses = []
+        
         st.write("---")
-        st.write("各學期期望學分 (總和須 >= 128)")
+        st.write("各學期期望學分")
         CreditList = []
         semesters = ["大一上", "大一下", "大二上", "大二下", "大三上", "大三下", "大四上", "大四下"]
+        default_credits = [20, 20, 20, 20, 12, 12, 12, 12]
         cols = st.columns(2)
         for i, sem in enumerate(semesters):
-            CreditList.append(cols[i%2].number_input(sem, min_value=0, max_value=30, value=16, key=f"credit_{i}"))
+            CreditList.append(cols[i%2].number_input(sem, min_value=0, max_value=30, value=default_credits[i], key=f"credit_{i}"))
 
         st.write("---")
-        # 開始按鈕
         start_button = st.button("🚀 開始產生推薦課表", use_container_width=True)
-        # 登出按鈕
-        if st.button("登出", use_container_width=True):
-            st.session_state["logged_in"] = False
-            st.rerun()
-
 
     # --- 主頁面邏輯 ---
     if start_button:
-        # 驗證輸入
         if len(EnglishNameList) != 2:
             st.error("輸入錯誤：請務必選擇 2 種不同的選修英文類型。")
         elif sum(CreditList) < 128:
             st.error(f"輸入錯誤：期望總學分 ({sum(CreditList)}) 不可低於 128。")
         else:
             with st.spinner('AI 助教正在根據您的設定，排千萬種可能... 請稍候...'):
-                # 載入資料
+                # 重新載入以確保拿到最新的資料
                 all_courses_df, cs_learn_df = load_data()
                 if all_courses_df is None:
                     st.error("嚴重錯誤：無法載入課程資料，請檢查 `data` 資料夾。")
@@ -148,6 +125,7 @@ def main_app():
                         "SelectCourse": SelectCourse,
                         "SelectType": SelectType,
                         "CreditList": CreditList,
+                        "unwanted_courses": unwanted_courses # 將不想上的課程傳入設定
                     }
                     
                     # 執行後端邏輯
@@ -174,12 +152,5 @@ def main_app():
 
 
 # ---程式進入點---
-# 檢查 session_state 中是否有登入標記
-if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
-
-# 根據登入狀態顯示不同頁面
-if st.session_state["logged_in"]:
+if __name__ == "__main__":
     main_app()
-else:
-    check_login()
