@@ -46,10 +46,10 @@ def main_app():
         
         # 選擇科系
         SelectNumberList = st.multiselect(
-            "選擇額外修習的科系",
+            "選擇額外修習的科系 (optional)",
             options=['1', '2'],
             format_func=lambda x: {'1': '數學系', '2': '物理系'}.get(x),
-            help="預設已包含資工、電資學院、通識、英文、大學中文。可多選。"
+            help="預設課程已包含資工、電資學院、通識、英文、大學中文。"
         )
 
         # 選擇課程 (物理/化學/生科)
@@ -79,17 +79,25 @@ def main_app():
             format_func=lambda x: eng_options.get(x)
         )
         
-        # 選擇不想上的課程 ***
         all_courses_df, _ = load_data()
         if all_courses_df is not None:
-            # 取得所有不重複的課程名稱並排序
             all_course_names = sorted(all_courses_df['中文課名'].unique().tolist())
+            
+            # 選擇想優先修習的課程
+            wanted_courses = st.multiselect(
+                "選擇想優先修習的特定課程 (可多選)",
+                options=all_course_names,
+                help="系統將會優先嘗試將這些課程排入課表。"
+            )
+
+            # 選擇不想上的課程
             unwanted_courses = st.multiselect(
                 "選擇不想上的特定課程 (可多選)",
                 options=all_course_names,
                 help="在此選擇的課程將不會出現在推薦課表中。"
             )
         else:
+            wanted_courses = []
             unwanted_courses = []
         
         st.write("---")
@@ -102,7 +110,7 @@ def main_app():
             CreditList.append(cols[i%2].number_input(sem, min_value=0, max_value=30, value=default_credits[i], key=f"credit_{i}"))
 
         st.write("---")
-        start_button = st.button("🚀 開始產生推薦課表", use_container_width=True)
+        start_button = st.button("開始產生推薦課表", use_container_width=True)
 
     # --- 主頁面邏輯 ---
     if start_button:
@@ -112,7 +120,6 @@ def main_app():
             st.error(f"輸入錯誤：期望總學分 ({sum(CreditList)}) 不可低於 128。")
         else:
             with st.spinner('AI 助教正在根據您的設定，排千萬種可能... 請稍候...'):
-                # 重新載入以確保拿到最新的資料
                 all_courses_df, cs_learn_df = load_data()
                 if all_courses_df is None:
                     st.error("嚴重錯誤：無法載入課程資料，請檢查 `data` 資料夾。")
@@ -125,7 +132,8 @@ def main_app():
                         "SelectCourse": SelectCourse,
                         "SelectType": SelectType,
                         "CreditList": CreditList,
-                        "unwanted_courses": unwanted_courses # 將不想上的課程傳入設定
+                        "unwanted_courses": unwanted_courses,
+                        "wanted_courses": wanted_courses # 將想上的課程傳入設定
                     }
                     
                     # 執行後端邏輯
