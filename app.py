@@ -22,7 +22,7 @@ def fill_in_time_schedule(dataframe, result_df):
 # --- 主應用程式介面 ---
 def main_app():
     st.set_page_config(page_title="清大課程推薦系統", page_icon="🎓", layout="wide")
-    st.title("🎓 清華大學課程推薦系統")
+    st.title("清華大學資工系課程推薦系統")
     st.info("本系統旨在幫助資工系學生根據畢業門檻和個人偏好，智慧推薦未來的修課排程。")
 
     all_courses_df, cs_learn_df = load_data()
@@ -32,7 +32,7 @@ def main_app():
 
     # --- 側邊欄 UI ---
     with st.sidebar:
-        st.header("⚙️ 個人化設定")
+        st.header("個人化設定")
 
         # 選擇已完成學期數
         completed_semesters = st.slider(
